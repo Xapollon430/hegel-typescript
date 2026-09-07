@@ -1,6 +1,6 @@
 /**
  * Thin, typed binding to the native `libhegel` C ABI (see
- * `hegel-rust/hegel-c/include/hegel.h`, version 0.32.5) via {@link koffi}.
+ * `hegel-rust/hegel-c/include/hegel.h`, version 0.37.0) via {@link koffi}.
  *
  * The {@link Libhegel} class owns the loaded library's function pointers and
  * exposes ergonomic wrappers. Every fallible call takes a `hegel_context_t*`
@@ -80,12 +80,12 @@ export interface NativeDate {
   day: number;
 }
 
-/** A `hegel_time_t`: a time of day with microsecond precision. */
+/** A `hegel_time_t`: a time of day with nanosecond precision. */
 export interface NativeTime {
   hour: number;
   minute: number;
   second: number;
-  microsecond: number;
+  nanosecond: number;
 }
 
 /** A `hegel_datetime_t`: a naive datetime (no timezone). */
@@ -140,7 +140,7 @@ const timeType: TypeObject = koffi.struct({
   hour: "uint8_t",
   minute: "uint8_t",
   second: "uint8_t",
-  microsecond: "uint32_t",
+  nanosecond: "uint32_t",
 });
 const datetimeType: TypeObject = koffi.struct({ date: dateType, time: timeType });
 // Both *_result_t structs are {pointer, len}. `data` is bound as uint8_t*
@@ -184,6 +184,10 @@ export interface Bindings {
   testCaseFromBlob: (ctx: Ptr, s: Ptr, blob: string | null, out: Ptr[]) => number;
   testCaseFree: (tc: Ptr) => void;
 
+  /**
+   * The C `forced` / `has_forced` parameters are absorbed as `false` / `false`
+   * (this client never forces a boolean draw).
+   */
   generateBoolean: (ctx: Ptr, tc: Ptr, p: number, out: boolean[]) => number;
   generateInteger: (
     ctx: Ptr,
@@ -205,6 +209,11 @@ export interface Bindings {
   generateBytesResultFree: (result: NativeBuffer) => void;
 
   stringGeneratorText: (ctx: Ptr, opts: TextGeneratorOptions, out: Ptr[]) => number;
+  /**
+   * The C `alphabet` parameter (an optional `hegel_string_generator_t*`
+   * restricting the character set) is absorbed as NULL — this client never
+   * constrains the regex alphabet.
+   */
   stringGeneratorRegex: (ctx: Ptr, pattern: string, fullmatch: boolean, out: Ptr[]) => number;
   stringGeneratorEmail: (ctx: Ptr, out: Ptr[]) => number;
   stringGeneratorUrl: (ctx: Ptr, out: Ptr[]) => number;
@@ -860,7 +869,7 @@ export class Libhegel {
 
   /** Draw a time of day in `[min, max]`. */
   generateTime(ctx: Ptr, tc: Ptr, min: NativeTime, max: NativeTime): NativeTime {
-    const out: NativeTime[] = [{ hour: 0, minute: 0, second: 0, microsecond: 0 }];
+    const out: NativeTime[] = [{ hour: 0, minute: 0, second: 0, nanosecond: 0 }];
     this.check(ctx, this.fns.generateTime(ctx, tc, min, max, out), "hegel_generate_time");
     return out[0];
   }
@@ -870,7 +879,7 @@ export class Libhegel {
     const out: NativeDatetime[] = [
       {
         date: { year: 0, month: 0, day: 0 },
-        time: { hour: 0, minute: 0, second: 0, microsecond: 0 },
+        time: { hour: 0, minute: 0, second: 0, nanosecond: 0 },
       },
     ];
     this.check(ctx, this.fns.generateDatetime(ctx, tc, min, max, out), "hegel_generate_datetime");
