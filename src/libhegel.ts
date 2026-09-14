@@ -1,6 +1,6 @@
 /**
  * Thin, typed binding to the native `libhegel` C ABI (see
- * `hegel-rust/hegel-c/include/hegel.h`, version 0.32.5) via {@link koffi}.
+ * `hegel-rust/hegel-c/include/hegel.h`, version 0.42.0) via {@link koffi}.
  *
  * The {@link Libhegel} class owns the loaded library's function pointers and
  * exposes ergonomic wrappers. Every fallible call takes a `hegel_context_t*`
@@ -48,12 +48,13 @@ export const RunStatus = {
   PASSED: 0,
   FAILED: 1,
   ERROR: 2,
+  FAILED_NONDETERMINISTIC: 3,
 } as const;
 
 /** `hegel_verbosity_t`. */
 export const NativeVerbosity = {
-  QUIET: 0,
-  NORMAL: 1,
+  NORMAL: 0,
+  QUIET: 1,
   VERBOSE: 2,
   DEBUG: 3,
 } as const;
@@ -80,12 +81,12 @@ export interface NativeDate {
   day: number;
 }
 
-/** A `hegel_time_t`: a time of day with microsecond precision. */
+/** A `hegel_time_t`: a time of day with nanosecond precision. */
 export interface NativeTime {
   hour: number;
   minute: number;
   second: number;
-  microsecond: number;
+  nanosecond: number;
 }
 
 /** A `hegel_datetime_t`: a naive datetime (no timezone). */
@@ -140,7 +141,7 @@ const timeType: TypeObject = koffi.struct({
   hour: "uint8_t",
   minute: "uint8_t",
   second: "uint8_t",
-  microsecond: "uint32_t",
+  nanosecond: "uint32_t",
 });
 const datetimeType: TypeObject = koffi.struct({ date: dateType, time: timeType });
 // Both *_result_t structs are {pointer, len}. `data` is bound as uint8_t*
@@ -157,7 +158,11 @@ const bufferResultType: TypeObject = koffi.struct({ data: "uint8_t*", len: "size
  * value-returning wrappers, with the C ABI's `out_*` marshalling and the
  * always-`HEGEL_OK` return code absorbed by {@link bindLibrary}. The output
  * callback taken by `hegel_run_start` / `hegel_test_case_from_blob` is likewise
- * absorbed as NULL (engine output stays on stderr).
+ * absorbed as NULL (engine output stays on stderr). Two further arguments the
+ * client never varies are absorbed the same way: `hegel_generate_boolean`'s
+ * `forced` / `has_forced` pair (always `false, false` — the client never forces
+ * a boolean draw) and `hegel_string_generator_regex`'s `alphabet` (always NULL
+ * — the client never constrains the regex alphabet).
  */
 export interface Bindings {
   contextNew: () => Ptr;
@@ -860,7 +865,7 @@ export class Libhegel {
 
   /** Draw a time of day in `[min, max]`. */
   generateTime(ctx: Ptr, tc: Ptr, min: NativeTime, max: NativeTime): NativeTime {
-    const out: NativeTime[] = [{ hour: 0, minute: 0, second: 0, microsecond: 0 }];
+    const out: NativeTime[] = [{ hour: 0, minute: 0, second: 0, nanosecond: 0 }];
     this.check(ctx, this.fns.generateTime(ctx, tc, min, max, out), "hegel_generate_time");
     return out[0];
   }
@@ -870,7 +875,7 @@ export class Libhegel {
     const out: NativeDatetime[] = [
       {
         date: { year: 0, month: 0, day: 0 },
-        time: { hour: 0, minute: 0, second: 0, microsecond: 0 },
+        time: { hour: 0, minute: 0, second: 0, nanosecond: 0 },
       },
     ];
     this.check(ctx, this.fns.generateDatetime(ctx, tc, min, max, out), "hegel_generate_datetime");
